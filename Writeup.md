@@ -164,7 +164,12 @@ As seen in the previous image, we inserted the command "os.system('id')" into th
 
 ![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/335631b8-3aba-4434-9cba-14a132b711d4)
 
+
 **That's all for now! I hope you enjoyed it and learned as much as I did while creating this lab. Cheers! kvzlx.**
+> My LinkedIn > https://www.linkedin.com/in/kevinvanegasz/
+> My Youtube > https://www.youtube.com/@kvzlx/videos
+> Discord Username > kvzlx
+
 
 > [!NOTE]
 > **Helpful Commands for Privilege Escalation!**
