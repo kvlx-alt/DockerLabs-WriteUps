@@ -175,7 +175,14 @@ As seen in the previous image, we inserted the command "os.system('id')" into th
 > Discord Username > kvzlx
 >
 >
->
+
+
+
+> [!NOTE]
+> I understand that an experienced person might have gone straight for the SQL injection, but my intention is always to adhere to the methodology of enumerating everything possible.
+
+
+
 
 > [!NOTE]
 > **Helpful Commands for Privilege Escalation!**
