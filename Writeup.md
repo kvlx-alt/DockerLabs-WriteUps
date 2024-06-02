@@ -176,7 +176,7 @@ As seen in the previous image, we inserted the command "os.system('id')" into th
 >
 >
 >
->
+
 > [!NOTE]
 > **Helpful Commands for Privilege Escalation!**
 > ```bash
