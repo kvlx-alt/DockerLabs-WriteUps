@@ -12,7 +12,9 @@ As always, I begin by scanning ports and service, using Nmap with the following 
 sudo nmap -p- --open --min-rate 5000 -n -Pn -sS 172.17.0.2 -oN logsnmap 
 ```
 
-![[Pasted image 20240601171545.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/88de5ccd-6daa-4564-93e9-235227f17210)
+
+
 
 Only two ports were open, suggesting that the intrusion point is likely through the website. To gather more information, I used the WhatWeb tool.
 
@@ -20,22 +22,22 @@ Only two ports were open, suggesting that the intrusion point is likely through 
 whatweb http://172.17.0.2/ 
 ```
 
-![[Pasted image 20240601171914.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/4dd522ef-217e-4ca6-b6f0-c29ad36fe548)
 
 The output provided some details about the target, but nothing immediately useful for exploitation. Therefore, I decided to inspect the website in a browser.
 
-![[Pasted image 20240601172447.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/4e692091-1dfe-474a-a7c7-06bc2094646d)
 
 The site appears to be a user search application with a note: "Avoid tools that automate; you learn more by doing it manually." The application seems to be designed to search for usernames input by the user.
 
-![[Pasted image 20240601173039.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/0a569727-d86a-4967-a69b-c4e819932e9d)
 
 I tried to search for the user "test" but got an alert saying "Unauthorized query." This is unusual because "test" is just a name, not some type of query or injection.
 
 Additionally, I noticed that the form uses a GET method  to query the database and retrieve the user.
 
-![[Pasted image 20240601173510.png]]
-![[Pasted image 20240601173539.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/0147d3ff-c95a-441d-a2da-b8199d6f6891)
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/21b81a11-e6d1-4710-ba75-77b5280e559a)
 
 I immediately thought of inserting some SQL injection payloads into the URL or trying to inject something. Additionally, I considered brute-forcing the search application to find valid users in the system. However, before proceeding, I decided to further enumerate the website for hidden directories or files using FFUF or Dirsearch.
 
@@ -45,16 +47,16 @@ OR
 ffuf -u 'http://172.17.0.2/FUZZ' -w $fuzz -e .php,.txt,.html
 ```
 
-![[Pasted image 20240601174053.png]]
-![[Pasted image 20240601174137.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/4d2e76e8-ba21-4a9d-aaba-88661450f082)
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/7990e6f7-2027-4640-920f-a2d6970358ec)
 
 I found nothing initially, so I tried searching for more usernames. When I tried the username "admin," I obtained some credentials.
 
-![[Pasted image 20240601174258.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/6edf3848-c221-42c9-9ba2-799da960c184)
 
 However, I couldn't find a login panel or any other application to use these credentials. Therefore, I thought they might be for the SSH service. Let's check.
 
-![[Pasted image 20240601174634.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/135defc9-f540-422f-ac7a-a2c3c10eaee9)
 
 These credentials are not for the SSH service, so now I'm unsure of their purpose.
 
@@ -66,7 +68,7 @@ while IFS= read -r username ;do echo -ne "\rTrying Username > $username >"; tput
 
 I discovered several usernames. However, when tested, most returned "No results found" rather than "Unauthorized query."
 
-![[Pasted image 20240601182943.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/78558e1f-4e3c-4206-8dba-b9f06214b03d)
 
 One particular username caught my attention: "select." To me, this doesn't seem like a regular username. As I mentioned before, this suggests an SQL injection vulnerability since "select" is a SQL query.
 
@@ -76,12 +78,12 @@ In SQL injection, we first need to confirm the vulnerability, determine the numb
 
 When attempting to inject the typical query (`' or 1=1-- -`), we got an "Unauthorized query" alert.
 
-![[Pasted image 20240601184441.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/f1cb7044-bbd1-4c34-8c03-2c186588e62b)
 
 
 Trying other queries resulted in the same alert, so I decided to experiment with '" order by". Surprisingly, this query yielded a "No results found" alert, indicating that it was allowed.
 
-![[Pasted image 20240601184528.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/305e7c98-5c00-4db7-88bc-e5321a95f1a3)
 
 Let's determine the number of columns using this query:
 
@@ -94,47 +96,47 @@ Now, let's play with the "union select" query:
 
 - `' union select 1,2,3-- -`: This should display values if there are three columns.
 
-![[Pasted image 20240601184927.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/5b48dacb-17ba-4a70-9596-6bfd1a6f9057)
 
 - `' union select 1,database(),3-- -`: This should display the currently used database.
-![[Pasted image 20240601184952.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/3f5b1ed4-1514-4f15-86a0-869ad175ad64)
 
 - `' union select 1,version(),3-- -`: This should display the MariaDB version.
 
-![[Pasted image 20240601185039.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/ead642a8-fbbd-46c8-84b8-d88999aa45a7)
 - `' union select 1,schema_name,3 from information_schema.schemata-- -`: This should list the databases.
 
-![[Pasted image 20240601185135.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/523ecadc-0a9e-4e8a-bcd4-5519d11bc154)
 
 - `' union select 1,table_name,3 from information_schema.tables where table_schema='testdb'-- -`: This should enumerate the tables.
 
-![[Pasted image 20240601185237.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/b53d6537-48ad-4274-9d38-055ce0916f1b)
 
 
 - `' union select 1,column_name,3 from information_schema.columns where table_schema='testdb' and table_name='users'-- -`: This should list the columns.
 
-![[Pasted image 20240601185337.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/aa9d0595-e4ce-403e-8d7c-4c4ffbebe82c)
 
 - `' union select 1,group_concat(username,':',password),3 from testdb.users-- -`: This should enumerate the usernames and passwords.
 
-![[Pasted image 20240601185546.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/826cb028-6997-4656-a0ac-3db8dd9b9084)
 
 
 We obtained additional credentials through the SQL injection vulnerability. 
 Using the username "kvzlx," we gained access to the server.
 
-![[Pasted image 20240601185757.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/22e613b9-39fa-4cc0-a964-c3c214a09fe9)
 
 **Now its time to escalate privilege!!**
 
 In the user's home directory, there is a Python script named "system_info.py" and a note. Upon checking permissions, we can execute and read this script.
-![[Pasted image 20240601190059.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/4c9bb9bb-0c4d-4c6f-9fe7-2cc001e4153d)
 
 This script,  utilizes the `psutil` library in Python to gather information about the system's virtual memory. There doesn't appear to be any obvious vulnerability in the script.
 
 I explored other possibilities but found nothing noteworthy. Then, I checked the sudo permissions and discovered that the user "kvzlx" has the ability to execute the script "system_info.py" as root using sudo.
 
-![[Pasted image 20240601190628.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/5a4e67a6-2c3f-463d-8fc0-1cb0f9d7295c)
 
 However, once more, it doesn't appear to be vulnerable.
 
@@ -144,23 +146,23 @@ One useful command is the one that can find world-writable files:
 ` find / -path /proc -prune -o -type f -perm -o+w 2>/dev/null `
 
 After executing the previous command, we obtain something very useful
-![[Pasted image 20240601194617.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/2eb27d7e-454f-4d8a-97a1-0259b714dfba)
 
 If we examine the script "system_info.py," we see that it imports the `psutil` module and utilizes the `virtual_memory()` function. Additionally, it's worth noting that we have write permissions for the `psutil/__init__.py` file.
 
 This implies the potential for a Python Library Hijacking exploit. With write permissions to this library, we can inject commands that enable privilege escalation. Since any functional code we write within this library will be executed as root, given our root permissions to execute the "system_info.py" script, we can import the `os` module, if not already imported in the library, which allows us to execute system commands.
 
-![[Pasted image 20240601195627.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/4fb78e56-dba2-47c4-b8d4-8c476180aa5a)
  
-![[Pasted image 20240601195946.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/5853bcb1-9a68-439a-b20f-70b8d06dfc9c)
 
-![[Pasted image 20240601200053.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/40db61e2-61cc-43bf-955e-2e303d1d21a7)
 
 As seen in the previous image, we inserted the command "os.system('id')" into the "psutil" library. Therefore, when we run the "system_info.py" script with sudo privileges, it displays the result of the "ID" command for root, thus confirming the Python Library Hijacking.  Next, we can proceed to modify the library again to insert another command that provides us with a root shell.
 
-![[Pasted image 20240601200705.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/e3fb6394-b469-4c54-bcef-d60a112393ba)
 
-![[Pasted image 20240601200727.png]]
+![image](https://github.com/kvlx-alt/DockerLabs-WriteUps/assets/118694485/335631b8-3aba-4434-9cba-14a132b711d4)
 
 **That's all for now! I hope you enjoyed it and learned as much as I did while creating this lab. Cheers! kvzlx.**
 
